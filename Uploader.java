@@ -9,7 +9,7 @@ public class Uploader
 
     public static void main(String[] args) 
     {
-        SwingUtilities.invokeLater(() -> new ReceiptUploader().createUI());
+        SwingUtilities.invokeLater(() -> new Uploader().createUI());
     }
 
 
