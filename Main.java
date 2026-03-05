@@ -15,7 +15,7 @@ public class Main
         // Add items
         receipt.items.add(new Receipt.LineItem("Milk", "4.50"));
         receipt.items.add(new Receipt.LineItem("Bread", "3.00"));
-        receipt.items.add(new Receipt.LineItem("Eggs", "5.49"));
+        receipt.items.add(new Receipt.LineItem("Eggs", "5.49"));   
 
         // Print receipt
         System.out.println(receipt);
