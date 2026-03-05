@@ -1,0 +1,70 @@
+import java.sql.*;
+
+public class ReceiptDatabase {
+
+    private static final String DB_URL = "jdbc:sqlite:receipts.db";
+
+    public static void initialize() {
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             Statement stmt = conn.createStatement()) {
+
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS receipts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    store_name TEXT,
+                    date TEXT,
+                    total REAL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """);
+
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS line_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    receipt_id INTEGER,
+                    description TEXT,
+                    amount REAL,
+                    FOREIGN KEY (receipt_id) REFERENCES receipts(id)
+                )
+            """);
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static int saveReceipt(Receipt receipt) {
+        String sql = "INSERT INTO receipts (store_name, date, total) VALUES (?, ?, ?)";
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            pstmt.setString(1, receipt.storeName);
+            pstmt.setString(2, receipt.date);
+            pstmt.setDouble(3, receipt.total);
+            pstmt.executeUpdate();
+
+            ResultSet keys = pstmt.getGeneratedKeys();
+            if (keys.next()) {
+                int receiptId = keys.getInt(1);
+                saveLineItems(conn, receiptId, receipt);
+                return receiptId;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    private static void saveLineItems(Connection conn, int receiptId, Receipt receipt) throws SQLException {
+        String sql = "INSERT INTO line_items (receipt_id, description, amount) VALUES (?, ?, ?)";
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            for (Receipt.LineItem item : receipt.items) {
+                pstmt.setInt(1, receiptId);
+                pstmt.setString(2, item.description);
+                pstmt.setDouble(3, item.amount);
+                pstmt.addBatch();
+            }
+            pstmt.executeBatch();
+        }
+    }
+}
