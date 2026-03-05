@@ -2,7 +2,7 @@ public class Main
 {
 
     public static void main(String[] args) 
-    {
+    { 
 
         // Create a receipt object
         Receipt receipt = new Receipt();
