@@ -8,6 +8,9 @@ public class ReceiptDatabase {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              Statement stmt = conn.createStatement()) {
 
+            // Enable foreign key support in SQLite
+            stmt.execute("PRAGMA foreign_keys = ON");
+
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS receipts (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,7 +27,7 @@ public class ReceiptDatabase {
                     receipt_id INTEGER,
                     description TEXT,
                     amount REAL,
-                    FOREIGN KEY (receipt_id) REFERENCES receipts(id)
+                    FOREIGN KEY (receipt_id) REFERENCES receipts(id) ON DELETE CASCADE
                 )
             """);
 
@@ -35,36 +38,60 @@ public class ReceiptDatabase {
 
     public static int saveReceipt(Receipt receipt) {
         String sql = "INSERT INTO receipts (store_name, date, total) VALUES (?, ?, ?)";
+
         try (Connection conn = DriverManager.getConnection(DB_URL);
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
+            conn.setAutoCommit(false);
+
             pstmt.setString(1, receipt.storeName);
             pstmt.setString(2, receipt.date);
-            pstmt.setDouble(3, receipt.total);
+            pstmt.setDouble(3, parseDoubleSafe(receipt.total));
+
             pstmt.executeUpdate();
 
             ResultSet keys = pstmt.getGeneratedKeys();
             if (keys.next()) {
                 int receiptId = keys.getInt(1);
                 saveLineItems(conn, receiptId, receipt);
+                conn.commit();
                 return receiptId;
+            } else {
+                conn.rollback();
             }
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
         return -1;
     }
 
     private static void saveLineItems(Connection conn, int receiptId, Receipt receipt) throws SQLException {
         String sql = "INSERT INTO line_items (receipt_id, description, amount) VALUES (?, ?, ?)";
+
         try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             for (Receipt.LineItem item : receipt.items) {
                 pstmt.setInt(1, receiptId);
-                pstmt.setString(2, item.description);
-                pstmt.setDouble(3, item.amount);
+                pstmt.setString(2, item.name);
+                pstmt.setDouble(3, parseDoubleSafe(item.price));
                 pstmt.addBatch();
             }
             pstmt.executeBatch();
+        }
+    }
+
+    private static double parseDoubleSafe(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return 0.0;
+        }
+
+        try {
+            // Remove dollar signs and commas if present
+            String cleaned = value.replace("$", "").replace(",", "").trim();
+            return Double.parseDouble(cleaned);
+        } catch (NumberFormatException e) {
+            return 0.0;
         }
     }
 }
