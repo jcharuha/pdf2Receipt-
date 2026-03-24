@@ -8,7 +8,6 @@ public class ReceiptDatabase {
         try (Connection conn = DriverManager.getConnection(DB_URL);
              Statement stmt = conn.createStatement()) {
 
-            // Enable foreign key support in SQLite
             stmt.execute("PRAGMA foreign_keys = ON");
 
             stmt.execute("""
@@ -24,7 +23,7 @@ public class ReceiptDatabase {
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS line_items (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    receipt_id INTEGER,
+                    receipt_id INTEGER NOT NULL,
                     description TEXT,
                     amount REAL,
                     FOREIGN KEY (receipt_id) REFERENCES receipts(id) ON DELETE CASCADE
@@ -44,27 +43,33 @@ public class ReceiptDatabase {
 
             conn.setAutoCommit(false);
 
-            pstmt.setString(1, receipt.storeName);
-            pstmt.setString(2, receipt.date);
-            pstmt.setDouble(3, parseDoubleSafe(receipt.total));
+            try {
+                pstmt.setString(1, receipt.storeName);
+                pstmt.setString(2, receipt.date);
+                pstmt.setDouble(3, parseDoubleSafe(receipt.total));
+                pstmt.executeUpdate();
 
-            pstmt.executeUpdate();
+                try (ResultSet keys = pstmt.getGeneratedKeys()) {
+                    if (!keys.next()) {
+                        conn.rollback();
+                        return -1;
+                    }
 
-            ResultSet keys = pstmt.getGeneratedKeys();
-            if (keys.next()) {
-                int receiptId = keys.getInt(1);
-                saveLineItems(conn, receiptId, receipt);
-                conn.commit();
-                return receiptId;
-            } else {
+                    int receiptId = keys.getInt(1);
+                    saveLineItems(conn, receiptId, receipt);
+                    conn.commit();
+                    return receiptId;
+                }
+
+            } catch (SQLException e) {
                 conn.rollback();
+                throw e;
             }
 
         } catch (SQLException e) {
             e.printStackTrace();
+            return -1;
         }
-
-        return -1;
     }
 
     private static void saveLineItems(Connection conn, int receiptId, Receipt receipt) throws SQLException {
@@ -87,7 +92,6 @@ public class ReceiptDatabase {
         }
 
         try {
-            // Remove dollar signs and commas if present
             String cleaned = value.replace("$", "").replace(",", "").trim();
             return Double.parseDouble(cleaned);
         } catch (NumberFormatException e) {
