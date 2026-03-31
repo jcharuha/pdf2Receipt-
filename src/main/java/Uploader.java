@@ -1,4 +1,5 @@
 import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.event.ActionEvent;
 import java.io.File;
 import java.io.IOException;
@@ -22,6 +23,10 @@ public class Uploader {
     private void openFileChooser(JFrame parent) {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle("Select Receipt PDF");
+
+        // Fix: only show PDF files
+        fileChooser.setAcceptAllFileFilterUsed(false);
+        fileChooser.setFileFilter(new FileNameExtensionFilter("PDF Files", "pdf"));
 
         int result = fileChooser.showOpenDialog(parent);
 
