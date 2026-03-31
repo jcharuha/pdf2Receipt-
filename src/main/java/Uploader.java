@@ -24,9 +24,23 @@ public class Uploader {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle("Select Receipt PDF");
 
-        // Fix: only show PDF files
-        fileChooser.setAcceptAllFileFilterUsed(false);
-        fileChooser.setFileFilter(new FileNameExtensionFilter("PDF Files", "pdf"));
+        // Start in receipts folder, falling back to user home.
+        File receiptsDir = new File("receipts");
+        if (!receiptsDir.exists()) {
+            receiptsDir.mkdirs();
+        }
+
+        if (receiptsDir.exists() && receiptsDir.isDirectory()) {
+            fileChooser.setCurrentDirectory(receiptsDir);
+        } else {
+            fileChooser.setCurrentDirectory(new File(System.getProperty("user.home")));
+        }
+
+        FileNameExtensionFilter pdfFilter = new FileNameExtensionFilter("PDF Files", "pdf", "PDF");
+        fileChooser.setFileFilter(pdfFilter);
+
+        // Allow users to switch filter if needed in case the system-derived extension does not match.
+        fileChooser.setAcceptAllFileFilterUsed(true);
 
         int result = fileChooser.showOpenDialog(parent);
 

@@ -10,10 +10,10 @@ public class ReceiptParser
 {
 
     private static final Pattern PRICE_LINE =
-            Pattern.compile("^(.+?)\\s+\\$?(\\d+[.,]\\d{2})\\s*$");
+            Pattern.compile("(.+?)\\s+\\$?(\\d{1,3}(?:[.,]\\d{3})*(?:[.,]\\d{2}))(?=\\s|$)");
 
     private static final Pattern TOTAL_LINE =
-            Pattern.compile("(?i)^\\s*total\\s*[: ]?\\$?(\\d+[.,]\\d{2})\\s*$");
+            Pattern.compile("(?i).*\\btotal\\b.*\\$?(\\d{1,3}(?:[.,]\\d{3})*(?:[.,]\\d{2})).*");
 
     private static final Pattern DATE_LINE =
             Pattern.compile("(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})");
@@ -40,6 +40,8 @@ public class ReceiptParser
             }
         }
 
+        String pendingItem = null;
+
         for (String line : lines) {
             String trimmed = line.trim();
             if (trimmed.isEmpty()) {
@@ -51,16 +53,24 @@ public class ReceiptParser
                 receipt.date = dateMatcher.group(1);
             }
 
-            Matcher totalMatcher = TOTAL_LINE.matcher(trimmed);
-            if (totalMatcher.find()) {
-                receipt.total = totalMatcher.group(1).replace(",", ".");
+            String lower = trimmed.toLowerCase();
+            if (lower.contains("subtotal") ||
+                lower.contains("tax") ||
+                lower.contains("change") ||
+                lower.contains("balance") ||
+                lower.contains("code") ||
+                lower.contains("points") ||
+                lower.contains("units") ||
+                lower.contains("size") ||
+                lower.contains("markdown")) {
+                pendingItem = null;
                 continue;
             }
 
-            if (trimmed.toLowerCase().contains("subtotal") ||
-                trimmed.toLowerCase().contains("tax") ||
-                trimmed.toLowerCase().contains("change") ||
-                trimmed.toLowerCase().contains("balance")) {
+            Matcher totalMatcher = TOTAL_LINE.matcher(trimmed);
+            if (totalMatcher.find()) {
+                receipt.total = totalMatcher.group(1).replace(",", ".");
+                pendingItem = null;
                 continue;
             }
 
@@ -69,9 +79,22 @@ public class ReceiptParser
                 String itemName = itemMatcher.group(1).trim();
                 String itemPrice = itemMatcher.group(2).replace(",", ".");
 
-                if (!itemName.equalsIgnoreCase("total")) {
+                // If no descriptive name on same line, use pending name if present
+                if (itemName.isEmpty() && pendingItem != null) {
+                    itemName = pendingItem;
+                }
+
+                if (!itemName.equalsIgnoreCase("total") && !itemName.isEmpty()) {
                     receipt.items.add(new Receipt.LineItem(itemName, itemPrice));
                 }
+
+                pendingItem = null;
+                continue;
+            }
+
+            // Keep possible multi-line description for next price-line
+            if (trimmed.length() > 2 && !trimmed.matches("^\\d+$")) {
+                pendingItem = trimmed;
             }
         }
 
