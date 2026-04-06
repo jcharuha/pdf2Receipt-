@@ -1,25 +1,30 @@
+import javax.swing.SwingUtilities;
+import java.util.Scanner;
+
 public class Main {
 
     public static void main(String[] args) 
     {
-
+        // Initialize database
         ReceiptDatabase.initialize();
 
-        javax.swing.SwingUtilities.invokeLater(() -> new Uploader().createUI());
+        // Start UI (Uploader)
+        SwingUtilities.invokeLater(() -> new Uploader().createUI());
 
+        // --- OPTIONAL: console-based price history search ---
+        Scanner scanner = new Scanner(System.in);
 
-        Receipt receipt = new Receipt();
-        receipt.storeName = "Target";
-        receipt.date = "03/04/2026";
-        receipt.total = "12.99";
+        while (true) {
+            System.out.print("\nEnter item name to check price history (or 'exit'): ");
+            String itemName = scanner.nextLine();
 
-        receipt.items.add(new Receipt.LineItem("Milk", "4.50"));
-        receipt.items.add(new Receipt.LineItem("Bread", "3.00"));
-        receipt.items.add(new Receipt.LineItem("Eggs", "5.49"));
+            if (itemName.equalsIgnoreCase("exit")) {
+                break;
+            }
 
-        int receiptId = ReceiptDatabase.saveReceipt(receipt);
+            ReceiptDatabase.printPriceHistory(itemName);
+        }
 
-        System.out.println("Saved receipt with ID: " + receiptId);
-        System.out.println(receipt);
+        scanner.close();
     }
 }
